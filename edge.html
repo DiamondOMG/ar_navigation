@@ -1,92 +1,156 @@
 ﻿<!doctype html>
 <html lang="th">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Edge Detection Demo</title>
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-  <style>
-    body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #fff; }
-    #ui { position: fixed; top: 12px; left: 12px; z-index: 10; background: rgba(0,0,0,.6); padding: 10px; border-radius: 8px; }
-    #video, #canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    #canvas { mix-blend-mode: screen; }
-    input { width: 160px; }
-  </style>
-</head>
-<body>
-  <div id="ui">
-    <div>Edge Detection (Canny)</div>
-    <button id="start">Start Camera</button>
-    <div>
-      <label>Low: <input id="low" type="range" min="0" max="255" value="50"></label>
-    </div>
-    <div>
-      <label>High: <input id="high" type="range" min="0" max="255" value="150"></label>
-    </div>
-    <div id="status">waiting...</div>
-  </div>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Edge Detection Demo</title>
+        <script
+            id="opencv"
+            async
+            src="https://docs.opencv.org/4.x/opencv.js"
+        ></script>
+        <style>
+            body {
+                margin: 0;
+                font-family: system-ui, sans-serif;
+                background: #111;
+                color: #fff;
+            }
+            #ui {
+                position: fixed;
+                top: 12px;
+                left: 12px;
+                z-index: 10;
+                background: rgba(0, 0, 0, 0.6);
+                padding: 10px;
+                border-radius: 8px;
+            }
+            #video,
+            #canvas {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            #canvas {
+                mix-blend-mode: screen;
+            }
+            input {
+                width: 160px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="ui">
+            <div>Edge Detection (Canny)</div>
+            <button id="start">Start Camera</button>
+            <div>
+                <label
+                    >Low:
+                    <input id="low" type="range" min="0" max="255" value="50"
+                /></label>
+            </div>
+            <div>
+                <label
+                    >High:
+                    <input id="high" type="range" min="0" max="255" value="150"
+                /></label>
+            </div>
+            <div id="status">waiting...</div>
+        </div>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
 
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const startBtn = document.getElementById('start');
-    const lowEl = document.getElementById('low');
-    const highEl = document.getElementById('high');
-    const statusEl = document.getElementById('status');
+        <script>
+            const video = document.getElementById("video");
+            const canvas = document.getElementById("canvas");
+            const startBtn = document.getElementById("start");
+            const lowEl = document.getElementById("low");
+            const highEl = document.getElementById("high");
+            const statusEl = document.getElementById("status");
 
-    let streaming = false;
-    let cap, src, gray, edges;
+            let streaming = false;
+            let cvReady = false;
+            let cap, src, gray, edges, rgba;
 
-    function setStatus(msg) { statusEl.textContent = msg; }
+            function setStatus(msg) {
+                statusEl.textContent = msg;
+            }
 
-    startBtn.addEventListener('click', async () => {
-      if (!window.isSecureContext) {
-        setStatus('ต้องรันผ่าน HTTPS หรือ localhost');
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          streaming = true;
-          setStatus('camera ready');
-        };
-      } catch (e) {
-        setStatus('camera error: ' + e.message);
-      }
-    });
+            startBtn.addEventListener("click", async () => {
+                if (!window.isSecureContext) {
+                    setStatus("ต้องรันผ่าน HTTPS หรือ localhost");
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment" },
+                        audio: false,
+                    });
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        streaming = true;
+                        setStatus("camera ready");
+                    };
+                } catch (e) {
+                    setStatus("camera error: " + e.message);
+                }
+            });
 
-    function onOpenCvReady() {
-      setStatus('opencv ready');
-    }
-    if (typeof cv !== 'undefined') cv['onRuntimeInitialized'] = onOpenCvReady;
-    else window.addEventListener('opencvready', onOpenCvReady);
+            function onOpenCvReady() {
+                cvReady = true;
+                setStatus("opencv ready");
+            }
+            document.getElementById("opencv").addEventListener("load", () => {
+                if (typeof cv !== "undefined") {
+                    cv["onRuntimeInitialized"] = onOpenCvReady;
+                } else {
+                    setStatus("opencv load failed");
+                }
+            });
 
-    function process() {
-      if (!streaming || typeof cv === 'undefined' || !cv.Mat) {
-        requestAnimationFrame(process);
-        return;
-      }
-      if (!cap) {
-        cap = new cv.VideoCapture(video);
-        src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
-        gray = new cv.Mat();
-        edges = new cv.Mat();
-      }
-      cap.read(src);
-      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-      const low = Number(lowEl.value);
-      const high = Number(highEl.value);
-      cv.Canny(gray, edges, low, high);
-      cv.imshow('canvas', edges);
-      requestAnimationFrame(process);
-    }
+            function process() {
+                if (!streaming || !cvReady) {
+                    requestAnimationFrame(process);
+                    return;
+                }
+                if (!cap) {
+                    cap = new cv.VideoCapture(video);
+                    src = new cv.Mat(
+                        video.videoHeight,
+                        video.videoWidth,
+                        cv.CV_8UC4,
+                    );
+                    gray = new cv.Mat();
+                    edges = new cv.Mat();
+                    rgba = new cv.Mat(
+                        video.videoHeight,
+                        video.videoWidth,
+                        cv.CV_8UC4,
+                    );
+                }
+                cap.read(src);
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                const low = Number(lowEl.value);
+                const high = Number(highEl.value);
+                cv.Canny(gray, edges, low, high);
+                cv.cvtColor(edges, rgba, cv.COLOR_GRAY2RGBA);
+                // tint edges to green
+                for (let i = 0; i < rgba.data.length; i += 4) {
+                    const v = rgba.data[i];
+                    rgba.data[i] = 0;
+                    rgba.data[i + 1] = v;
+                    rgba.data[i + 2] = 0;
+                    rgba.data[i + 3] = v;
+                }
+                cv.imshow("canvas", rgba);
+                requestAnimationFrame(process);
+            }
 
-    process();
-  </script>
-</body>
+            process();
+        </script>
+    </body>
 </html>
