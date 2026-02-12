@@ -1,109 +1,153 @@
 ﻿<!doctype html>
 <html lang="th">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Step Distance Test</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 24px; }
-    #dist { font-size: 40px; font-weight: 700; }
-    button { padding: 10px 14px; margin-right: 8px; }
-    #status { margin-top: 10px; color: #555; }
-  </style>
-</head>
-<body>
-  <h1>Distance From Ref</h1>
-  <button id="start">เริ่มนับระยะ</button>
-  <button id="reset">รีเซ็ต</button>
-  <div id="dist">0.0 m</div>
-  <div id="steps">0 steps</div>
-  <div id="status">waiting...</div>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Step Distance Test</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                margin: 24px;
+            }
+            #dist {
+                font-size: 40px;
+                font-weight: 700;
+            }
+            button {
+                padding: 10px 14px;
+                margin-right: 8px;
+            }
+            #status {
+                margin-top: 10px;
+                color: #555;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Distance From Ref</h1>
+        <button id="start">เริ่มนับระยะ</button>
+        <button id="reset">รีเซ็ต</button>
+        <div id="dist">0.0 m</div>
+        <div id="steps">0 steps</div>
+        <div id="status">waiting...</div>
 
-  <script>
-    const startBtn = document.getElementById('start');
-    const resetBtn = document.getElementById('reset');
-    const distEl = document.getElementById('dist');
-    const stepsEl = document.getElementById('steps');
-    const statusEl = document.getElementById('status');
+        <script>
+            const startBtn = document.getElementById("start");
+            const resetBtn = document.getElementById("reset");
+            const distEl = document.getElementById("dist");
+            const stepsEl = document.getElementById("steps");
+            const statusEl = document.getElementById("status");
 
-    let started = false;
-    let steps = 0;
-    let distance = 0;
+            let started = false;
+            let steps = 0;
+            let distance = 0;
 
-    const stepLength = 0.7; // meters (ปรับตามจริง)
-    const threshold = 1.2;  // m/s^2 above gravity (ปรับตามจริง)
-    const minStepInterval = 300; // ms
+            const baseStepLength = 0.7; // meters
+            const baseFreq = 1.7; // steps/sec
+            const k = 0.25; // length adjustment per (steps/sec)
+            const minStep = 0.45;
+            const maxStep = 0.9;
+            const threshold = 1.2; // m/s^2 above gravity (ปรับตามจริง)
+            const minStepInterval = 300; // ms
 
-    let lastStepTime = 0;
-    let gravity = { x: 0, y: 0, z: 0 };
-    const alpha = 0.8; // low-pass for gravity
+            let lastStepTime = 0;
+            const stepIntervals = [];
+            let gravity = { x: 0, y: 0, z: 0 };
+            const alpha = 0.8; // low-pass for gravity
 
-    function setStatus(msg) { statusEl.textContent = msg; }
+            function setStatus(msg) {
+                statusEl.textContent = msg;
+            }
 
-    function updateUI() {
-      distEl.textContent = distance.toFixed(1) + ' m';
-      stepsEl.textContent = steps + ' steps';
-    }
+            function updateUI() {
+                distEl.textContent = distance.toFixed(1) + " m";
+                stepsEl.textContent = steps + " steps";
+            }
 
-    async function requestMotionPermission() {
-      if (!window.isSecureContext) {
-        setStatus('ต้องรันผ่าน HTTPS หรือ localhost');
-        return false;
-      }
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        const res = await DeviceMotionEvent.requestPermission();
-        setStatus('permission: ' + res);
-        return res === 'granted';
-      }
-      setStatus('permission not required');
-      return true;
-    }
+            async function requestMotionPermission() {
+                if (!window.isSecureContext) {
+                    setStatus("ต้องรันผ่าน HTTPS หรือ localhost");
+                    return false;
+                }
+                if (
+                    typeof DeviceMotionEvent !== "undefined" &&
+                    typeof DeviceMotionEvent.requestPermission === "function"
+                ) {
+                    const res = await DeviceMotionEvent.requestPermission();
+                    setStatus("permission: " + res);
+                    return res === "granted";
+                }
+                setStatus("permission not required");
+                return true;
+            }
 
-    function onMotion(e) {
-      if (!started) return;
-      const acc = e.accelerationIncludingGravity;
-      if (!acc) return;
+            function onMotion(e) {
+                if (!started) return;
+                const acc = e.accelerationIncludingGravity;
+                if (!acc) return;
 
-      // low-pass to estimate gravity
-      gravity.x = alpha * gravity.x + (1 - alpha) * acc.x;
-      gravity.y = alpha * gravity.y + (1 - alpha) * acc.y;
-      gravity.z = alpha * gravity.z + (1 - alpha) * acc.z;
+                // low-pass to estimate gravity
+                gravity.x = alpha * gravity.x + (1 - alpha) * acc.x;
+                gravity.y = alpha * gravity.y + (1 - alpha) * acc.y;
+                gravity.z = alpha * gravity.z + (1 - alpha) * acc.z;
 
-      const linX = acc.x - gravity.x;
-      const linY = acc.y - gravity.y;
-      const linZ = acc.z - gravity.z;
+                const linX = acc.x - gravity.x;
+                const linY = acc.y - gravity.y;
+                const linZ = acc.z - gravity.z;
 
-      const magnitude = Math.sqrt(linX*linX + linY*linY + linZ*linZ);
-      const now = Date.now();
+                const magnitude = Math.sqrt(
+                    linX * linX + linY * linY + linZ * linZ,
+                );
+                const now = Date.now();
 
-      if (magnitude > threshold && (now - lastStepTime) > minStepInterval) {
-        lastStepTime = now;
-        steps += 1;
-        distance = steps * stepLength;
-        updateUI();
-      }
-    }
+                if (
+                    magnitude > threshold &&
+                    now - lastStepTime > minStepInterval
+                ) {
+                    if (lastStepTime > 0) {
+                        const dt = now - lastStepTime;
+                        stepIntervals.push(dt);
+                        if (stepIntervals.length > 6) stepIntervals.shift();
+                    }
+                    lastStepTime = now;
+                    steps += 1;
+                    let stepLength = baseStepLength;
+                    if (stepIntervals.length >= 3) {
+                        const avgDt =
+                            stepIntervals.reduce((a, b) => a + b, 0) /
+                            stepIntervals.length;
+                        const freq = 1000 / avgDt;
+                        stepLength = baseStepLength + k * (freq - baseFreq);
+                        if (stepLength < minStep) stepLength = minStep;
+                        if (stepLength > maxStep) stepLength = maxStep;
+                    }
+                    distance = distance + stepLength;
+                    updateUI();
+                }
+            }
 
-    startBtn.addEventListener('click', async () => {
-      const ok = await requestMotionPermission();
-      if (!ok) return;
-      started = true;
-      steps = 0;
-      distance = 0;
-      lastStepTime = 0;
-      updateUI();
-      setStatus('กำลังนับระยะ...');
-    });
+            startBtn.addEventListener("click", async () => {
+                const ok = await requestMotionPermission();
+                if (!ok) return;
+                started = true;
+                steps = 0;
+                distance = 0;
+                lastStepTime = 0;
+                stepIntervals.length = 0;
+                updateUI();
+                setStatus("กำลังนับระยะ...");
+            });
 
-    resetBtn.addEventListener('click', () => {
-      steps = 0;
-      distance = 0;
-      lastStepTime = 0;
-      updateUI();
-      setStatus('รีเซ็ตแล้ว');
-    });
+            resetBtn.addEventListener("click", () => {
+                steps = 0;
+                distance = 0;
+                lastStepTime = 0;
+                stepIntervals.length = 0;
+                updateUI();
+                setStatus("รีเซ็ตแล้ว");
+            });
 
-    window.addEventListener('devicemotion', onMotion, true);
-  </script>
-</body>
+            window.addEventListener("devicemotion", onMotion, true);
+        </script>
+    </body>
 </html>
