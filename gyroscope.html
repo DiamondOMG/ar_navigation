@@ -1,0 +1,172 @@
+﻿<!doctype html>
+<html lang="th">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Gyroscope 0-360</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                margin: 24px;
+            }
+            #deg {
+                font-size: 48px;
+                font-weight: 700;
+            }
+            button {
+                padding: 10px 14px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Gyroscope 2</h1>
+        <button id="btn">Request Motion Permission</button>
+        <div id="deg">--</div>
+        <div id="status"></div>
+
+        <script>
+            const deg = document.getElementById("deg");
+            const btn = document.getElementById("btn");
+            const status = document.getElementById("status");
+            let zeroOffset = 0;
+            let lastRawHeading = null;
+            let calibrating = false;
+            const calSamples = [];
+
+            const samples = [];
+            const windowSize = 12;
+            const emaAlpha = 0.2;
+            let ema = null;
+
+            function meanAngleDeg(list) {
+                if (!list.length) return null;
+                let sinSum = 0;
+                let cosSum = 0;
+                for (const a of list) {
+                    const rad = (a * Math.PI) / 180;
+                    sinSum += Math.sin(rad);
+                    cosSum += Math.cos(rad);
+                }
+                let angle = (Math.atan2(sinSum, cosSum) * 180) / Math.PI;
+                if (angle < 0) angle += 360;
+                return angle;
+            }
+
+            const step = 45;
+            const hysteresis = 30;
+            let lastSnap = null;
+
+            function snap8(angle) {
+                const step = 45;
+                let snapped = Math.round(angle / step) * step;
+                if (snapped === 360) snapped = 0;
+                return snapped;
+            }
+
+            function show(v) {
+                if (ema == null) ema = v;
+                else {
+                    let diff = v - ema;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    ema = (ema + emaAlpha * diff + 360) % 360;
+                }
+                samples.push(ema);
+                if (samples.length > windowSize) samples.shift();
+                const avg = meanAngleDeg(samples);
+                if (avg == null) return;
+                if (lastSnap == null) {
+                    lastSnap = snap8(avg);
+                } else {
+                    let target = snap8(avg);
+                    let diff = Math.abs(target - lastSnap);
+                    if (diff > 180) diff = 360 - diff;
+                    if (diff >= hysteresis) lastSnap = target;
+                }
+                deg.textContent = lastSnap.toFixed(0) + "°";
+            }
+
+            function setStatus(msg) {
+                status.textContent = msg;
+            }
+
+            function startCalibration() {
+                calibrating = true;
+                calSamples.length = 0;
+                let count = 3;
+                setStatus("คาลิเบรตใน " + count);
+                const t = setInterval(() => {
+                    count -= 1;
+                    if (count > 0) {
+                        setStatus("คาลิเบรตใน " + count);
+                    } else {
+                        clearInterval(t);
+                        const avg = meanAngleDeg(calSamples);
+                        if (avg != null) {
+                            zeroOffset = avg;
+                            setStatus("คาลิเบรตแล้ว (0°)");
+                        } else {
+                            setStatus("คาลิเบรตไม่สำเร็จ");
+                        }
+                        calibrating = false;
+                    }
+                }, 1000);
+            }
+
+            async function requestMotionPermission() {
+                try {
+                    if (!window.isSecureContext) {
+                        setStatus("ต้องรันผ่าน HTTPS หรือ localhost");
+                        return;
+                    }
+                    if (
+                        typeof DeviceOrientationEvent !== "undefined" &&
+                        typeof DeviceOrientationEvent.requestPermission ===
+                            "function"
+                    ) {
+                        const res =
+                            await DeviceOrientationEvent.requestPermission();
+                        setStatus("permission: " + res);
+                        if (res !== "granted") return;
+                    } else {
+                        setStatus("permission not required");
+                    }
+                    startCalibration();
+                } catch (e) {
+                    setStatus("permission error: " + e);
+                }
+            }
+
+            btn.addEventListener("click", requestMotionPermission);
+
+            function handleOrientation(e) {
+                let heading = null;
+                if (typeof e.webkitCompassHeading === "number") {
+                    heading = e.webkitCompassHeading; // iOS
+                } else if (typeof e.alpha === "number") {
+                    heading = e.alpha;
+                }
+                if (heading == null) return;
+                lastRawHeading = heading;
+                heading = heading % 360;
+                if (heading < 0) heading += 360;
+                if (calibrating) calSamples.push(heading);
+                heading = (heading - zeroOffset + 360) % 360;
+                show(heading);
+            }
+
+            window.addEventListener(
+                "deviceorientation",
+                handleOrientation,
+                true,
+            );
+            window.addEventListener(
+                "deviceorientationabsolute",
+                handleOrientation,
+                true,
+            );
+
+            startCalibration();
+        </script>
+    </body>
+</html>

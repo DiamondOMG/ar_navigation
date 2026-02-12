@@ -1,0 +1,65 @@
+﻿<!doctype html>
+<html lang="th">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>AR Nav Test</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                margin: 24px;
+            }
+            button {
+                padding: 10px 14px;
+            }
+            pre {
+                background: #f5f5f5;
+                padding: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>AR Nav Test 693d</h1>
+        <p>หน้านี้ไว้เทสเปิดบนมือถือแบบเร็วๆ</p>
+        <button id="btn">Request Motion Permission</button>
+        <pre id="out">waiting...</pre>
+
+        <script>
+            const out = document.getElementById("out");
+            const btn = document.getElementById("btn");
+
+            function log(msg) {
+                out.textContent = msg;
+            }
+
+            async function requestMotionPermission() {
+                try {
+                    if (
+                        typeof DeviceMotionEvent !== "undefined" &&
+                        typeof DeviceMotionEvent.requestPermission ===
+                            "function"
+                    ) {
+                        const res = await DeviceMotionEvent.requestPermission();
+                        log("DeviceMotion permission: " + res);
+                    } else {
+                        log(
+                            "DeviceMotion permission not required or not supported",
+                        );
+                    }
+                } catch (e) {
+                    log("DeviceMotion permission error: " + e);
+                }
+            }
+
+            btn.addEventListener("click", requestMotionPermission);
+
+            window.addEventListener("deviceorientation", (e) => {
+                const msg =
+                    `alpha: ${e.alpha?.toFixed(1)}\n` +
+                    `beta: ${e.beta?.toFixed(1)}\n` +
+                    `gamma: ${e.gamma?.toFixed(1)}`;
+                log(msg);
+            });
+        </script>
+    </body>
+</html>
