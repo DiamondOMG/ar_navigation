@@ -1,0 +1,7 @@
+﻿{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/gyroscope", "destination": "/gyroscope.html" },
+    { "source": "/arjs", "destination": "/arjs.html" }
+  ]
+}
