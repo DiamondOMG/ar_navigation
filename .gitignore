@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build artifacts
+/dist/
+
+# local ssl keys
+ssl/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AlvaAR
+AlvaAR/
