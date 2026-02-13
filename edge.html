@@ -1,156 +1,324 @@
 ﻿<!doctype html>
 <html lang="th">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Edge Detection Demo</title>
-        <script
-            id="opencv"
-            async
-            src="https://docs.opencv.org/4.x/opencv.js"
-        ></script>
-        <style>
-            body {
-                margin: 0;
-                font-family: system-ui, sans-serif;
-                background: #111;
-                color: #fff;
-            }
-            #ui {
-                position: fixed;
-                top: 12px;
-                left: 12px;
-                z-index: 10;
-                background: rgba(0, 0, 0, 0.6);
-                padding: 10px;
-                border-radius: 8px;
-            }
-            #video,
-            #canvas {
-                position: absolute;
-                inset: 0;
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-            }
-            #canvas {
-                mix-blend-mode: screen;
-            }
-            input {
-                width: 160px;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="ui">
-            <div>Edge Detection (Canny)</div>
-            <button id="start">Start Camera</button>
-            <div>
-                <label
-                    >Low:
-                    <input id="low" type="range" min="0" max="255" value="50"
-                /></label>
-            </div>
-            <div>
-                <label
-                    >High:
-                    <input id="high" type="range" min="0" max="255" value="150"
-                /></label>
-            </div>
-            <div id="status">waiting...</div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canny + Hough (OpenCV.js) Demo</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #111;
+        color: #fff;
+      }
+      #ui {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px;
+        border-radius: 8px;
+        min-width: 240px;
+      }
+      #video,
+      #canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      #canvas {
+        mix-blend-mode: screen;
+      }
+      input {
+        width: 180px;
+      }
+      .row {
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+      progress {
+        width: 100%;
+      }
+      button:disabled {
+        opacity: 0.6;
+      }
+      small { opacity: 0.85; }
+    </style>
+  </head>
+
+  <body>
+    <div id="ui">
+      <div><b>Corridor-ish (Canny + Hough)</b></div>
+
+      <div class="row">
+        <button id="start" disabled>Start Camera</button>
+        <span id="status">loading opencv…</span>
+      </div>
+
+      <div style="margin-top:8px;">
+        <progress id="dl" value="0" max="100"></progress>
+        <div class="row">
+          <small id="dlText">0%</small>
+          <small id="cvText">init…</small>
         </div>
-        <video id="video" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
+      </div>
 
-        <script>
-            const video = document.getElementById("video");
-            const canvas = document.getElementById("canvas");
-            const startBtn = document.getElementById("start");
-            const lowEl = document.getElementById("low");
-            const highEl = document.getElementById("high");
-            const statusEl = document.getElementById("status");
+      <hr style="border-color: rgba(255,255,255,0.15); margin:10px 0;" />
 
-            let streaming = false;
-            let cvReady = false;
-            let cap, src, gray, edges, rgba;
+      <div class="row">
+        <label>Low</label>
+        <input id="low" type="range" min="0" max="255" value="60" />
+      </div>
+      <div class="row">
+        <label>High</label>
+        <input id="high" type="range" min="0" max="255" value="160" />
+      </div>
 
-            function setStatus(msg) {
-                statusEl.textContent = msg;
+      <div class="row">
+        <label>Hough Thres</label>
+        <input id="hth" type="range" min="10" max="200" value="60" />
+      </div>
+
+      <div class="row">
+        <label>MinLen</label>
+        <input id="minlen" type="range" min="10" max="300" value="80" />
+      </div>
+
+      <div class="row">
+        <label>MaxGap</label>
+        <input id="maxgap" type="range" min="1" max="80" value="20" />
+      </div>
+
+      <small>
+        ทิป: ถ้าเส้นเยอะเกิน → เพิ่ม High/Threshold, เพิ่ม MinLen<br/>
+        ถ้าเส้นหาย → ลด Threshold/MinLen, เพิ่ม MaxGap
+      </small>
+    </div>
+
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+      const OPENCV_URL = "https://docs.opencv.org/4.x/opencv.js";
+
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const startBtn = document.getElementById("start");
+
+      const lowEl = document.getElementById("low");
+      const highEl = document.getElementById("high");
+      const hthEl = document.getElementById("hth");
+      const minLenEl = document.getElementById("minlen");
+      const maxGapEl = document.getElementById("maxgap");
+
+      const statusEl = document.getElementById("status");
+      const dlBar = document.getElementById("dl");
+      const dlText = document.getElementById("dlText");
+      const cvText = document.getElementById("cvText");
+
+      let streaming = false;
+      let cvReady = false;
+
+      // OpenCV mats/resources
+      let cap, src, gray, edges, rgba, lines;
+      // Performance: process at smaller size (downscale) then draw lines scaled up
+      const PROC_W = 480; // ปรับได้ 360/480/640
+
+      function setStatus(msg) {
+        statusEl.textContent = msg;
+      }
+
+      // ---------- Load OpenCV with download progress ----------
+      function loadOpenCVWithProgress() {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", OPENCV_URL, true);
+          xhr.responseType = "arraybuffer";
+
+          xhr.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              dlBar.value = pct;
+              dlText.textContent = pct + "%";
+            } else {
+              dlText.textContent = "downloading…";
             }
+          };
 
-            startBtn.addEventListener("click", async () => {
-                if (!window.isSecureContext) {
-                    setStatus("ต้องรันผ่าน HTTPS หรือ localhost");
-                    return;
-                }
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: "environment" },
-                        audio: false,
-                    });
-                    video.srcObject = stream;
-                    video.onloadedmetadata = () => {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        streaming = true;
-                        setStatus("camera ready");
-                    };
-                } catch (e) {
-                    setStatus("camera error: " + e.message);
-                }
-            });
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              cvText.textContent = "inject script…";
+              const blob = new Blob([xhr.response], { type: "text/javascript" });
+              const url = URL.createObjectURL(blob);
 
-            function onOpenCvReady() {
-                cvReady = true;
-                setStatus("opencv ready");
+              const script = document.createElement("script");
+              script.src = url;
+              script.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve();
+              };
+              script.onerror = (err) => reject(err);
+              document.body.appendChild(script);
+            } else {
+              reject(new Error("Failed to download opencv.js: HTTP " + xhr.status));
             }
-            document.getElementById("opencv").addEventListener("load", () => {
-                if (typeof cv !== "undefined") {
-                    cv["onRuntimeInitialized"] = onOpenCvReady;
-                } else {
-                    setStatus("opencv load failed");
-                }
-            });
+          };
 
-            function process() {
-                if (!streaming || !cvReady) {
-                    requestAnimationFrame(process);
-                    return;
-                }
-                if (!cap) {
-                    cap = new cv.VideoCapture(video);
-                    src = new cv.Mat(
-                        video.videoHeight,
-                        video.videoWidth,
-                        cv.CV_8UC4,
-                    );
-                    gray = new cv.Mat();
-                    edges = new cv.Mat();
-                    rgba = new cv.Mat(
-                        video.videoHeight,
-                        video.videoWidth,
-                        cv.CV_8UC4,
-                    );
-                }
-                cap.read(src);
-                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                const low = Number(lowEl.value);
-                const high = Number(highEl.value);
-                cv.Canny(gray, edges, low, high);
-                cv.cvtColor(edges, rgba, cv.COLOR_GRAY2RGBA);
-                // tint edges to green
-                for (let i = 0; i < rgba.data.length; i += 4) {
-                    const v = rgba.data[i];
-                    rgba.data[i] = 0;
-                    rgba.data[i + 1] = v;
-                    rgba.data[i + 2] = 0;
-                    rgba.data[i + 3] = v;
-                }
-                cv.imshow("canvas", rgba);
-                requestAnimationFrame(process);
-            }
+          xhr.onerror = () => reject(new Error("Network error while downloading opencv.js"));
+          xhr.send();
+        });
+      }
 
-            process();
-        </script>
-    </body>
+      async function initOpenCV() {
+        try {
+          await loadOpenCVWithProgress();
+          cvText.textContent = "runtime init…";
+
+          // wait cv runtime
+          cv["onRuntimeInitialized"] = () => {
+            cvReady = true;
+            cvText.textContent = "ready";
+            setStatus("opencv ready");
+            startBtn.disabled = false;
+          };
+        } catch (e) {
+          setStatus("opencv load failed: " + e.message);
+          cvText.textContent = "failed";
+        }
+      }
+
+      initOpenCV();
+
+      // ---------- Camera ----------
+      startBtn.addEventListener("click", async () => {
+        if (!window.isSecureContext) {
+          setStatus("ต้องรันผ่าน HTTPS หรือ localhost");
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+          video.srcObject = stream;
+
+          video.onloadedmetadata = () => {
+            // keep canvas at video size for nice overlay
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            streaming = true;
+            setStatus("camera ready");
+            requestAnimationFrame(process);
+          };
+        } catch (e) {
+          setStatus("camera error: " + e.message);
+        }
+      });
+
+      // ---------- Processing (Canny + HoughLinesP) ----------
+      function ensureMats() {
+        if (cap) return;
+
+        cap = new cv.VideoCapture(video);
+
+        // Source is RGBA, but we'll downscale into a smaller mat for speed
+        src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+        gray = new cv.Mat();
+        edges = new cv.Mat();
+        rgba = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+
+        lines = new cv.Mat(); // output of HoughLinesP (Nx1x4)
+      }
+
+      function process() {
+        if (!streaming || !cvReady) {
+          requestAnimationFrame(process);
+          return;
+        }
+        ensureMats();
+
+        cap.read(src);
+
+        // Downscale for processing
+        const scale = PROC_W / src.cols;
+        const procH = Math.round(src.rows * scale);
+
+        const small = new cv.Mat();
+        cv.resize(src, small, new cv.Size(PROC_W, procH), 0, 0, cv.INTER_AREA);
+
+        const smallGray = new cv.Mat();
+        cv.cvtColor(small, smallGray, cv.COLOR_RGBA2GRAY);
+
+        // Optional: blur helps reduce noise
+        const blurred = new cv.Mat();
+        cv.GaussianBlur(smallGray, blurred, new cv.Size(5, 5), 1.2, 1.2, cv.BORDER_DEFAULT);
+
+        const low = Number(lowEl.value);
+        const high = Number(highEl.value);
+        cv.Canny(blurred, edges, low, high);
+
+        // HoughLinesP on edges
+        const threshold = Number(hthEl.value);
+        const minLineLength = Number(minLenEl.value);
+        const maxLineGap = Number(maxGapEl.value);
+
+        // rho=1 pixel, theta=1 degree
+        cv.HoughLinesP(
+          edges,
+          lines,
+          1,
+          Math.PI / 180,
+          threshold,
+          minLineLength,
+          maxLineGap
+        );
+
+        // Prepare overlay: start from transparent-ish
+        rgba.setTo(new cv.Scalar(0, 0, 0, 0));
+
+        // Draw detected line segments (green)
+        // scale lines back up to full-res canvas
+        const inv = 1 / scale;
+
+        for (let i = 0; i < lines.rows; i++) {
+          const x1 = lines.data32S[i * 4 + 0] * inv;
+          const y1 = lines.data32S[i * 4 + 1] * inv;
+          const x2 = lines.data32S[i * 4 + 2] * inv;
+          const y2 = lines.data32S[i * 4 + 3] * inv;
+
+          // filter out near-horizontal lines if you want corridor sides:
+          // const ang = Math.abs(Math.atan2(y2 - y1, x2 - x1)) * 180 / Math.PI;
+          // if (ang < 20) continue;
+
+          cv.line(rgba, new cv.Point(x1, y1), new cv.Point(x2, y2), new cv.Scalar(0, 255, 0, 200), 4);
+        }
+
+        cv.imshow("canvas", rgba);
+
+        // cleanup temps
+        small.delete();
+        smallGray.delete();
+        blurred.delete();
+
+        requestAnimationFrame(process);
+      }
+
+      // Cleanup on unload
+      window.addEventListener("beforeunload", () => {
+        try {
+          [cap, src, gray, edges, rgba, lines].forEach((m) => m && m.delete && m.delete());
+        } catch {}
+      });
+    </script>
+  </body>
 </html>
