@@ -7,20 +7,108 @@
         <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
         <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
         <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+        <style>
+            #debug {
+                position: fixed;
+                top: 12px;
+                left: 12px;
+                z-index: 9999;
+                padding: 10px 12px;
+                background: rgba(0, 0, 0, 0.65);
+                color: #fff;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
+                font-size: 12px;
+                line-height: 1.4;
+                border-radius: 6px;
+                max-width: 280px;
+                white-space: pre-line;
+            }
+        </style>
     </head>
 
     <body>
+        <div id="debug">waiting for gps...</div>
         <a-scene
             vr-mode-ui="enabled: false"
-            arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+            arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true;"
         >
             <a-text
                 value="This content will always face you."
                 look-at="[gps-camera]"
                 scale="120 120 120"
-                <!--gps-entity-place="latitude: 13.748663; longitude: 100.54787;"-->
+                gps-entity-place="latitude: 13.748663; longitude: 100.54787;"
             ></a-text>
             <a-camera gps-camera rotation-reader> </a-camera>
         </a-scene>
+        <script>
+            const debugEl = document.getElementById("debug");
+            const sceneEl = document.querySelector("a-scene");
+
+            function formatCoord(v) {
+                if (v == null || Number.isNaN(v)) return "-";
+                return v.toFixed(6);
+            }
+
+            function distanceMeters(lat1, lon1, lat2, lon2) {
+                if (
+                    [lat1, lon1, lat2, lon2].some(
+                        (v) => v == null || Number.isNaN(v),
+                    )
+                ) {
+                    return null;
+                }
+                const R = 6371000;
+                const toRad = (d) => (d * Math.PI) / 180;
+                const dLat = toRad(lat2 - lat1);
+                const dLon = toRad(lon2 - lon1);
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(toRad(lat1)) *
+                        Math.cos(toRad(lat2)) *
+                        Math.sin(dLon / 2) *
+                        Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c;
+            }
+
+            sceneEl.addEventListener("loaded", () => {
+                const cam = document.querySelector("[gps-camera]");
+                const target = document.querySelector("[gps-entity-place]");
+                const targetAttr =
+                    target.getAttribute("gps-entity-place") || {};
+
+                const targetLat = parseFloat(targetAttr.latitude);
+                const targetLon = parseFloat(targetAttr.longitude);
+
+                cam.addEventListener("gps-camera-update-position", (e) => {
+                    const { latitude, longitude, accuracy, altitude } =
+                        e.detail.position;
+                    const dist = distanceMeters(
+                        latitude,
+                        longitude,
+                        targetLat,
+                        targetLon,
+                    );
+
+                    debugEl.textContent =
+                        "cam lat: " +
+                        formatCoord(latitude) +
+                        "\ncam lon: " +
+                        formatCoord(longitude) +
+                        "\naccuracy: " +
+                        (accuracy != null ? accuracy.toFixed(1) + " m" : "-") +
+                        "\naltitude: " +
+                        (altitude != null ? altitude.toFixed(1) + " m" : "-") +
+                        "\n\npin lat: " +
+                        formatCoord(targetLat) +
+                        "\npin lon: " +
+                        formatCoord(targetLon) +
+                        "\n\ndistance: " +
+                        (dist != null ? dist.toFixed(1) + " m" : "-");
+                });
+            });
+        </script>
     </body>
 </html>
