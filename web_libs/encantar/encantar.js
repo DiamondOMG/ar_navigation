@@ -5,7 +5,7 @@
  * https://encantar.dev
  *
  * @license LGPL-3.0-or-later
- * Date: 2026-02-13T09:00:35.973Z
+ * Date: 2026-02-13T09:14:29.599Z
 */
 var AR = (() => {
   var __create = Object.create;
@@ -13763,7 +13763,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   });
 
   // src/core/session.ts
-  var import_speedy_vision3, SessionEvent, DEFAULT_OPTIONS, EmptyTrackerResult, _Session, Session;
+  var import_speedy_vision3, SessionEvent, DEFAULT_OPTIONS, AR_FLAGS, EmptyTrackerResult, _Session, Session;
   var init_session = __esm({
     "src/core/session.ts"() {
       "use strict";
@@ -13788,6 +13788,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
         stats: false,
         gizmos: false
       };
+      AR_FLAGS = Number(3);
       EmptyTrackerResult = class extends TrackerResult {
         constructor(tracker) {
           super();
@@ -13822,9 +13823,17 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           this._primarySource = this._findPrimarySource(sources);
           this._viewport = viewport;
           if (this._primarySource !== null)
-            this._viewport._init(() => this._primarySource._internalMedia.size, mode, stats);
+            this._viewport._init(
+              () => this._primarySource._internalMedia.size,
+              mode,
+              stats
+            );
           else
-            this._viewport._init(() => Utils.resolution("sm", window.innerWidth / window.innerHeight), mode, stats);
+            this._viewport._init(
+              () => Utils.resolution("sm", window.innerWidth / window.innerHeight),
+              mode,
+              stats
+            );
           _Session._count++;
           Utils.log(`The ${this._mode} session is now active!`);
         }
@@ -13834,22 +13843,27 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
          */
         static isSupported() {
           if (/(Mac|iOS|iPhone|iPad|iPod)/i.test(navigator.platform)) {
-            const ios = /(iPhone|iPad|iPod).* (CPU[\s\w]* OS|CPU iPhone|iOS) ([\d\._]+)/.exec(navigator.userAgent);
-            const safari = /(AppleWebKit)\/.* (Version)\/([\d\.]+)/.exec(navigator.userAgent);
+            const ios = /(iPhone|iPad|iPod).* (CPU[\s\w]* OS|CPU iPhone|iOS) ([\d\._]+)/.exec(
+              navigator.userAgent
+            );
+            const safari = /(AppleWebKit)\/.* (Version)\/([\d\.]+)/.exec(
+              navigator.userAgent
+            );
             const matches = safari || ios;
             if (matches !== null) {
               const version2 = matches[3] || "0.0";
               const [x, y] = version2.split(/[\._]/).map((v2) => parseInt(v2) | 0);
               if (x < 15 || x == 15 && y < 2) {
-                Utils.error(`${matches === safari ? "Safari" : "iOS"} version ${version2} is not supported! User agent: ${navigator.userAgent}`);
+                Utils.error(
+                  `${matches === safari ? "Safari" : "iOS"} version ${version2} is not supported! User agent: ${navigator.userAgent}`
+                );
                 return false;
               }
-            } else
-              Utils.warning(`Unrecognized user agent: ${navigator.userAgent}`);
+            } else Utils.warning(`Unrecognized user agent: ${navigator.userAgent}`);
           }
           return import_speedy_vision3.default.isSupported();
         }
-        /** 
+        /**
          * Instantiate a session
          * @param options options
          * @returns a promise that resolves to a new session
@@ -13866,12 +13880,23 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           Utils.log(`Starting a new ${mode} session...`);
           return import_speedy_vision3.default.Promise.resolve().then(() => {
             if (!_Session.isSupported())
-              throw new NotSupportedError("You need a browser/device compatible with WebGL2 and WebAssembly in order to experience Augmented Reality with encantar.js");
+              throw new NotSupportedError(
+                "You need a browser/device compatible with WebGL2 and WebAssembly in order to experience Augmented Reality with encantar.js"
+              );
             if (mode !== "inline" && _Session.count > 0)
-              throw new IllegalOperationError(`Can't start multiple sessions, except in inline mode`);
+              throw new IllegalOperationError(
+                `Can't start multiple sessions, except in inline mode`
+              );
             const isStableBuild = /^\d+\.\d+(\.\d+)*$/.test(Utils.engineVersion);
-            if (!isStableBuild) {
-              if (!["localhost", "127.0.0.1", "[::1]", "", "encantar.dev", "alemart.github.io"].includes(location.hostname)) {
+            if (!isStableBuild && !(AR_FLAGS & 2)) {
+              if (![
+                "localhost",
+                "127.0.0.1",
+                "[::1]",
+                "",
+                "encantar.dev",
+                "alemart.github.io"
+              ].includes(location.hostname)) {
                 if (!(location.hostname.startsWith("192.168.") || location.hostname.startsWith("10.") || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(location.hostname))) {
                   const message = "This is a development build (unstable). Do not use it in production. Get a stable release at encantar.dev";
                   Utils.warning(message);
@@ -13886,12 +13911,12 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
               if (sources.indexOf(sources[i]) < i)
                 throw new IllegalArgumentError(`Found repeated sources of data`);
             }
-            return import_speedy_vision3.default.Promise.all(
-              sources.map((source) => source._init())
-            );
+            return import_speedy_vision3.default.Promise.all(sources.map((source) => source._init()));
           }).then(() => {
             if (!viewport)
-              throw new IllegalArgumentError(`Can't create a session without a viewport`);
+              throw new IllegalArgumentError(
+                `Can't create a session without a viewport`
+              );
             return new _Session(sources, mode, viewport, stats, gizmos);
           }).then((session) => {
             if (trackers.length == 0)
@@ -13922,17 +13947,20 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
          * @returns promise that resolves after the session is shut down
          */
         end() {
-          if (!this._active)
-            return import_speedy_vision3.default.Promise.resolve();
+          if (!this._active) return import_speedy_vision3.default.Promise.resolve();
           Utils.log("Shutting down the session...");
           this._active = false;
-          return Utils.wait(100).then(() => import_speedy_vision3.default.Promise.all(
-            // release trackers
-            this._trackers.map((tracker) => tracker._release())
-          )).then(() => import_speedy_vision3.default.Promise.all(
-            // release input sources
-            this._sources.map((source) => source._release())
-          )).then(() => {
+          return Utils.wait(100).then(
+            () => import_speedy_vision3.default.Promise.all(
+              // release trackers
+              this._trackers.map((tracker) => tracker._release())
+            )
+          ).then(
+            () => import_speedy_vision3.default.Promise.all(
+              // release input sources
+              this._sources.map((source) => source._release())
+            )
+          ).then(() => {
             this._sources.length = 0;
             this._trackers.length = 0;
             this._updateStats.reset();
@@ -14027,13 +14055,11 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
         _findPrimarySource(sources) {
           for (let i = 0; i < sources.length; i++) {
             const source = sources[i];
-            if (source._is("video-source"))
-              return source;
+            if (source._is("video-source")) return source;
           }
           for (let i = 0; i < sources.length; i++) {
             const source = sources[i];
-            if (source._is("canvas-source"))
-              return source;
+            if (source._is("canvas-source")) return source;
           }
           Utils.warning(`No primary source of data was found!`);
           return null;
@@ -14045,9 +14071,13 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
          */
         _attachTracker(tracker) {
           if (this._trackers.indexOf(tracker) >= 0)
-            return import_speedy_vision3.default.Promise.reject(new IllegalArgumentError(`Duplicate tracker attached to the session`));
+            return import_speedy_vision3.default.Promise.reject(
+              new IllegalArgumentError(`Duplicate tracker attached to the session`)
+            );
           else if (!this._active)
-            return import_speedy_vision3.default.Promise.reject(new IllegalOperationError(`Inactive session`));
+            return import_speedy_vision3.default.Promise.reject(
+              new IllegalOperationError(`Inactive session`)
+            );
           this._trackers.push(tracker);
           return tracker._init(this);
         }
@@ -14057,8 +14087,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
         _renderBackground() {
           const canvas = this._viewport._backgroundCanvas;
           const ctx = canvas.getContext("2d", { alpha: false });
-          if (!ctx)
-            return;
+          if (!ctx) return;
           ctx.imageSmoothingEnabled = false;
           if (this._primarySource !== null) {
             const media = this._primarySource._internalMedia;
@@ -14066,8 +14095,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           }
           for (let i = 0; i < this._trackers.length; i++) {
             const media = this._trackers[i]._output.image;
-            if (media !== void 0)
-              this._renderMedia(ctx, media, false);
+            if (media !== void 0) this._renderMedia(ctx, media, false);
           }
           this._gizmos._render(this._viewport, this._trackers);
         }
@@ -14094,12 +14122,9 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
          */
         _setupUpdateLoop() {
           const scheduleNextFrame = () => {
-            if (!this._active)
-              return;
-            else if (Settings.powerPreference == "high-performance")
-              asap(repeat);
-            else
-              window.requestAnimationFrame(repeat);
+            if (!this._active) return;
+            else if (Settings.powerPreference == "high-performance") asap(repeat);
+            else window.requestAnimationFrame(repeat);
           };
           const update = () => {
             this._update().then(scheduleNextFrame).turbocharge();
@@ -14107,8 +14132,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           function repeat() {
             if (Settings.powerPreference == "low-power")
               window.requestAnimationFrame(update);
-            else
-              update();
+            else update();
           }
           window.requestAnimationFrame(update);
         }
@@ -14151,10 +14175,8 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
             const enableFrameSkipping = Settings.powerPreference == "low-power";
             const highPerformance = Settings.powerPreference == "high-performance";
             this._time._update(timestamp);
-            if (!enableFrameSkipping || !(skip = !skip))
-              this._render(timestamp);
-            if (this._active)
-              window.requestAnimationFrame(render);
+            if (!enableFrameSkipping || !(skip = !skip)) this._render(timestamp);
+            if (this._active) window.requestAnimationFrame(render);
           };
           window.requestAnimationFrame(render);
         }
@@ -14172,16 +14194,21 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
               const frame = new Frame(this, results);
               const rafQueue = this._rafQueue.slice(0);
               this._rafQueue.length = 0;
-              if (!skipUserMedia)
-                this._renderBackground();
+              if (!skipUserMedia) this._renderBackground();
               for (let i = 0; i < rafQueue.length; i++)
                 rafQueue[i][1].call(void 0, time, frame);
               this._renderStats.update();
               this._frameReady = false;
               const statsPanel = this._viewport.hud._statsPanel;
-              statsPanel.update(time, this._sources, this._trackers, this._viewport, this._updateStats.cyclesPerSecond, this._renderStats.cyclesPerSecond);
+              statsPanel.update(
+                time,
+                this._sources,
+                this._trackers,
+                this._viewport,
+                this._updateStats.cyclesPerSecond,
+                this._renderStats.cyclesPerSecond
+              );
             } else {
-              ;
               this._renderStats.update();
             }
           } else {
@@ -20219,7 +20246,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   });
 
   // src/ui/reminder-dialog.ts
-  var TITLE, MESSAGE, PRIMARY_ACTION, SECONDARY_ACTION, TARGET_URL, ONE_DAY, REMINDER_TIMEOUT, REMINDER_KEY, AR_FLAGS, ReminderDialog;
+  var TITLE, MESSAGE, PRIMARY_ACTION, SECONDARY_ACTION, TARGET_URL, ONE_DAY, REMINDER_TIMEOUT, REMINDER_KEY, AR_FLAGS2, ReminderDialog;
   var init_reminder_dialog = __esm({
     "src/ui/reminder-dialog.ts"() {
       "use strict";
@@ -20235,7 +20262,7 @@ This software respects you and puts you in control \u2014 values often overlooke
       ONE_DAY = 86400;
       REMINDER_TIMEOUT = ONE_DAY;
       REMINDER_KEY = "encantar-reminder-0.4.7-dev";
-      AR_FLAGS = Number(1);
+      AR_FLAGS2 = Number(3);
       ReminderDialog = class {
         /**
          * Constructor
@@ -20287,7 +20314,7 @@ This software respects you and puts you in control \u2014 values often overlooke
          * @returns a boolean
          */
         _isEnabled() {
-          if (AR_FLAGS & 1)
+          if (AR_FLAGS2 & 1)
             return false;
           const now = Math.floor(Date.now() * 1e-3);
           const lastReminder = Number(localStorage.getItem(REMINDER_KEY) ?? "0");
