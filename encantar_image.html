@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1, maximum-scale=1" />
+    <title>Encantar Image Lock Demo</title>
+    <script src="./web_libs/encantar/encantar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.7.1/dist/aframe-v1.7.1.min.js"></script>
+    <script src="./web_libs/encantar/plugins/aframe-with-encantar.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #status {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        z-index: 9999;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font: 14px/1.3 sans-serif;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.6);
+      }
+    </style>
+    <script>
+      AFRAME.registerComponent('lock-on-first-track', {
+        schema: {
+          key: { type: 'string' },
+          label: { type: 'string' }
+        },
+
+        init: function () {
+          this.locked = false;
+          this.statusNode = document.getElementById('status');
+        },
+
+        tick: function () {
+          if (this.locked) return;
+
+          const root = this.el;
+          const obj = root.object3D;
+          if (!obj || !obj.visible) return;
+
+          obj.updateMatrixWorld(true);
+
+          const anchor = document.createElement('a-entity');
+          anchor.setAttribute('geometry', 'primitive: circle; radius: 0.16; segments: 48');
+          anchor.setAttribute('material', 'color: #ff2a2a; shader: flat; side: double; opacity: 0.95');
+
+          const pos = new THREE.Vector3();
+          const quat = new THREE.Quaternion();
+          const scale = new THREE.Vector3();
+
+          obj.matrixWorld.decompose(pos, quat, scale);
+          anchor.object3D.position.copy(pos);
+          anchor.object3D.quaternion.copy(quat);
+          anchor.object3D.scale.set(1, 1, 1);
+
+          root.sceneEl.appendChild(anchor);
+
+          this.locked = true;
+          if (this.statusNode) {
+            this.statusNode.textContent = 'Locked: ' + this.data.label;
+          }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="status">Scan one of the two images to place a red circle.</div>
+
+    <a-scene encantar="stats: true; gizmos: true" loading-screen="enabled: false">
+      <ar-sources>
+        <ar-camera-source></ar-camera-source>
+      </ar-sources>
+
+      <ar-trackers>
+        <ar-image-tracker resolution="360p">
+          <ar-reference-image name="in-view" src="./location_tracking/in_view_digital_room.jpg"></ar-reference-image>
+          <ar-reference-image name="out-view" src="./location_tracking/out_view_digital_room.jpg"></ar-reference-image>
+        </ar-image-tracker>
+      </ar-trackers>
+
+      <ar-viewport></ar-viewport>
+      <ar-camera></ar-camera>
+
+      <ar-root
+        reference-image="in-view"
+        lock-on-first-track="key: in-view; label: in_view_digital_room.jpg"
+      ></ar-root>
+
+      <ar-root
+        reference-image="out-view"
+        lock-on-first-track="key: out-view; label: out_view_digital_room.jpg"
+      ></ar-root>
+    </a-scene>
+  </body>
+</html>
