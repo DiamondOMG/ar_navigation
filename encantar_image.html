@@ -93,7 +93,7 @@
         </script>
     </head>
     <body>
-        <div id="status">Scan door_clean.jpg to place a red circle.</div>
+        <div id="status">Scan door_panels_main.jpg to place a red circle.</div>
 
         <a-scene
             encantar="stats: true; gizmos: true"
@@ -110,7 +110,7 @@
                 <ar-image-tracker resolution="720p">
                     <ar-reference-image
                         name="door"
-                        src="./door_clean.jpg"
+                        src="./door_panels_main.jpg"
                     ></ar-reference-image>
                 </ar-image-tracker>
             </ar-trackers>
@@ -120,7 +120,7 @@
 
             <ar-root
                 reference-image="door"
-                lock-on-first-track="key: door; label: door_clean.jpg"
+                lock-on-first-track="key: door; label: door_panels_main.jpg"
             >
                 <a-sphere
                     position="0 0 0.15"
