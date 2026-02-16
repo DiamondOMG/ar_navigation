@@ -93,7 +93,7 @@
         </script>
     </head>
     <body>
-        <div id="status">Scan face.jpg to place a red circle.</div>
+        <div id="status">Scan door_panel_right.jpg to place a red circle.</div>
 
         <a-scene
             encantar="stats: true; gizmos: true"
@@ -109,8 +109,8 @@
             <ar-trackers>
                 <ar-image-tracker resolution="720p">
                     <ar-reference-image
-                        name="face"
-                        src="./location_tracking/face.jpg"
+                        name="door"
+                        src="./door_panel_right.jpg"
                     ></ar-reference-image>
                 </ar-image-tracker>
             </ar-trackers>
@@ -119,13 +119,13 @@
             <ar-camera></ar-camera>
 
             <ar-root
-                reference-image="face"
-                lock-on-first-track="key: face; label: face.jpg"
+                reference-image="door"
+                lock-on-first-track="key: door; label: door_panel_right.jpg"
             >
                 <a-sphere
                     position="0 0 0.15"
                     radius="0.07"
-                    color="#7cff6b"
+                    color="#ff2a2a"
                     material="shader: flat; opacity: 0.9"
                     animation="property: scale; dir: alternate; dur: 900; loop: true; to: 1.2 1.2 1.2"
                 ></a-sphere>
