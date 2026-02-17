@@ -27,6 +27,10 @@
             encantar="stats: false; gizmos: false"
             loading-screen="enabled: false"
         >
+            <a-assets>
+                <a-asset-item id="arrow-model" src="assets/arrow.glb"></a-asset-item>
+            </a-assets>
+
             <ar-sources>
                 <ar-camera-source
                     resolution="1080p"
@@ -46,37 +50,18 @@
             <ar-viewport></ar-viewport>
             <ar-camera></ar-camera>
 
-            <!-- Track สำเร็จ → แสดงวงกลมที่ตำแหน่งรูป -->
+            <!-- Light for GLTF model -->
+            <a-light type="ambient" intensity="3.1416"></a-light>
+
+            <!-- Track สำเร็จ → แสดงโมเดลลูกศร -->
             <ar-root reference-image="door">
-
-                <!-- วงกลมวงนอก -->
-                <a-ring
-                    position="0 0 0.01"
-                    radius-inner="0.18"
-                    radius-outer="0.22"
-                    color="#00e5ff"
-                    material="shader: flat; side: double; opacity: 0.9"
-                    animation="property: scale; dir: alternate; dur: 1000; loop: true; from: 0.9 0.9 0.9; to: 1.15 1.15 1.15; easing: easeInOutSine"
-                ></a-ring>
-
-                <!-- วงกลมวงใน --->
-                <a-ring
-                    position="0 0 0.02"
-                    radius-inner="0.08"
-                    radius-outer="0.12"
-                    color="#00e5ff"
-                    material="shader: flat; side: double; opacity: 0.7"
-                    animation="property: scale; dir: alternate; dur: 700; loop: true; from: 1 1 1; to: 1.2 1.2 1.2; easing: easeInOutSine"
-                ></a-ring>
-
-                <!-- จุดกลาง -->
-                <a-circle
-                    position="0 0 0.03"
-                    radius="0.03"
-                    color="#00e5ff"
-                    material="shader: flat; opacity: 0.8"
-                ></a-circle>
-
+                <a-entity
+                    gltf-model="#arrow-model"
+                    position="0 0 0.1"
+                    rotation="90 0 0"
+                    scale="0.5 0.5 0.5"
+                    animation="property: position; to: 0 0 0.2; dir: alternate; dur: 800; loop: true; easing: easeInOutSine"
+                ></a-entity>
             </ar-root>
         </a-scene>
     </body>
