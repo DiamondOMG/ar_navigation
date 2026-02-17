@@ -28,7 +28,7 @@
             loading-screen="enabled: false"
         >
             <a-assets>
-                <a-asset-item id="arrow-model" src="assets/arrow.glb"></a-asset-item>
+                <a-asset-item id="arrow-model" src="assets/direction_arrow.glb"></a-asset-item>
             </a-assets>
 
             <ar-sources>
@@ -58,8 +58,8 @@
                 <a-entity
                     gltf-model="#arrow-model"
                     position="0 0 0.1"
-                    rotation="90 0 0"
-                    scale="0.5 0.5 0.5"
+                    rotation="270 0 0"
+                    scale="0.2 0.2 0.2"
                     animation="property: position; to: 0 0 0.2; dir: alternate; dur: 800; loop: true; easing: easeInOutSine"
                 ></a-entity>
             </ar-root>
